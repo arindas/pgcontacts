@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 
@@ -11,7 +14,7 @@ import (
 
 var authlessPaths = []string{"/api/user/new", "/api/user/login"}
 
-func reportError(w http.ResponseWriter, err string) {
+func writeErrorResponse(w http.ResponseWriter, err string) {
 	w.WriteHeader(http.StatusForbidden)
 	w.Header().Add("Content-Type", "application/json")
 	var data map[string]interface{}
@@ -29,38 +32,37 @@ type Token struct {
 // MiddleWare mux middleware for parsing JWT authenctication token
 func MiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if (sort.SearchStrings(authlessPaths, r.URL.PATH)) {
+		if sort.SearchStrings(authlessPaths, r.URL.Path) < 0 {
 			tokenHeader := r.Header.Get("Authorization")
 
 			if len(tokenHeader) == 0 {
-				reportError(w, "Missing auth token")
+				writeErrorResponse(w, "Missing auth token")
 				return
 			}
 
 			tokenContents := strings.Split(tokenHeader, " ")
 			if len(tokenContents) != 2 {
-				reportError(w, "Invalid/Malformed auth token")
+				writeErrorResponse(w, "Invalid/Malformed auth token")
 				return
 			}
 
 			tokenPart := tokenContents[1]
 			tk := &Token{}
 
-			token, err := jwt.ParseWithClaims(tokenPart, tk, func(token * jwt.Token)) {
+			token, err := jwt.ParseWithClaims(tokenPart, tk, func(token *jwt.Token) (interface{}, error) {
 				return []byte(os.Getenv("token_password")), nil
-			}
+			})
 
 			if err != nil {
-				reportError(w, "Malformed auth token")
+				writeErrorResponse(w, "Malformed auth token")
 				return
 			}
 
 			if !token.Valid {
-				reportError(w, "Token is not valid.")
+				writeErrorResponse(w, "Token is not valid.")
 				return
 			}
 
-			fmt.Sprintf("User %s", tk.Username)
 			ctx := context.WithValue(r.Context(), "user", tk.UserID)
 			r = r.WithContext(ctx)
 		}
