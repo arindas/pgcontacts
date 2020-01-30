@@ -21,8 +21,8 @@ func respondWithError(w http.ResponseWriter, err string) {
 
 // Token is a jwt.StandardClaims wrapper
 type Token struct {
-	UserID uint
 	jwt.StandardClaims
+	UserID uint
 }
 
 // AuthMiddleWare is a mux.MiddleWare for parsing
