@@ -21,6 +21,12 @@ func main() {
 	router.HandleFunc("/api/user/login",
 		controllers.Authenticate).Methods("POST")
 
+	router.HandleFunc("/me/contacts/new",
+		controllers.CreateContact).Methods("POST")
+
+	router.HandleFunc("/me/contacts",
+		controllers.GetContactsForUser).Methods("GET")
+
 	port := os.Getenv("PORT")
 	if len(port) == 0 { // if PORT is not set
 		port = "8080"
