@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"github.com/jinzhu/gorm"
 	"golang.org/x/crypto/bcrypt"
 	"os"
@@ -54,6 +55,16 @@ func (account *Account) Validate() (map[string]interface{}, bool) {
 	}
 }
 
+func (account *Account) setToken() {
+	tokenWrapper := &app.Token{UserID: account.ID}
+	token := jwt.NewWithClaims(jwt.GetSigningMethod("HS256"), tokenWrapper)
+	if tokenString, err := token.SignedString([]byte(os.Getenv("token_password"))); err != nil {
+		panic(err)
+	} else {
+		account.Token = tokenString
+	}
+}
+
 // Creates an account and returns a json encodable response
 // containing the details of the account creation
 func (account *Account) Create() map[string]interface{} {
@@ -74,15 +85,49 @@ func (account *Account) Create() map[string]interface{} {
 		return utils.Message("Failed to create account", false)
 	}
 
-	tokenWrapper := &app.Token{UserID: account.ID}
-	token := jwt.NewWithClaims(jwt.GetSigningMethod("HS256"), tokenWrapper)
-	if tokenString, err := token.SignedString([]byte(os.Getenv("token_password"))); err != nil {
-		panic(err)
-	} else {
-		account.Token = tokenString
-	}
+	account.setToken()
 
 	response := utils.Message("Account has been created.", true)
 	response["account"] = account
 	return response
+}
+
+func Login(email, password string) map[string]interface{} {
+
+	account := &Account{}
+	query := app.GetDB().Table("accounts").Where("email = ?", email).First(account)
+	if errors := query.GetErrors(); len(errors) > 0 {
+		if query.RecordNotFound() {
+			return utils.Message(
+				fmt.Sprintf("Account with email: %s not found.", email), false)
+		}
+
+		return utils.Message((gorm.Errors)(errors).Error(), false)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(password)); err != nil {
+		if err == bcrypt.ErrMismatchedHashAndPassword {
+			return utils.Message("Invalid login credentials, please try again.", false)
+		}
+
+		panic(err)
+	}
+
+	account.setToken()
+
+	response := utils.Message("Logged in.", true)
+	response["account"] = account
+	return response
+}
+
+func GetUser(id uint) *Account {
+	account := &Account{}
+	query := app.GetDB().Table("accounts").Where("id = ?", id).First(account)
+
+	if errors := query.GetErrors(); len(errors) > 0 {
+		return nil
+	}
+
+	account.Password = ""
+	return account
 }
