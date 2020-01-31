@@ -17,8 +17,12 @@ import (
 type Account struct {
 	gorm.Model
 	Email    string `json:"email"`
-	Password string `json:"-"`
+	Password string `json:"password"`
 	Token    string `json:"token" sql:"-"`
+}
+
+func init() {
+	app.GetDB().AutoMigrate(&Account{})
 }
 
 func validEmail(email string) bool {
@@ -88,6 +92,7 @@ func (account *Account) Create() map[string]interface{} {
 	account.setToken()
 
 	response := utils.Message("Account has been created.", true)
+	account.Password = ""
 	response["account"] = account
 	return response
 }
@@ -116,6 +121,7 @@ func Login(email, password string) map[string]interface{} {
 	account.setToken()
 
 	response := utils.Message("Logged in.", true)
+	account.Password = ""
 	response["account"] = account
 	return response
 }
